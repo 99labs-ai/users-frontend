@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession, signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "https://users-api-latest.onrender.com";
 
@@ -25,6 +27,8 @@ interface FormData {
 const COUNTRIES = ["México", "Colombia", "Argentina", "Chile", "España", "República Dominicana"];
 
 export default function Home() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -33,6 +37,12 @@ export default function Home() {
     first_name: "", last_name: "", email: "", age: "", country: "México",
   });
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (status === "unauthenticated") {
+      router.push("/login");
+    }
+  }, [status, router]);
 
   const fetchUsers = async () => {
     try {
@@ -46,7 +56,9 @@ export default function Home() {
     }
   };
 
-  useEffect(() => { fetchUsers(); }, []);
+  useEffect(() => {
+    if (status === "authenticated") fetchUsers();
+  }, [status]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,6 +95,16 @@ export default function Home() {
     setSeeding(false);
   };
 
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <p className="text-gray-400">Cargando...</p>
+      </div>
+    );
+  }
+
+  if (status === "unauthenticated") return null;
+
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-5xl mx-auto">
@@ -92,7 +114,14 @@ export default function Home() {
             <h1 className="text-3xl font-bold text-gray-900">Users</h1>
             <p className="text-gray-500 mt-1">{users.length} usuarios registrados</p>
           </div>
-          <div className="flex gap-3">
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-500">{session?.user?.email}</span>
+            <button
+              onClick={() => signOut({ callbackUrl: "/login" })}
+              className="px-4 py-2 text-sm border border-gray-300 hover:bg-gray-100 rounded-lg font-medium transition"
+            >
+              Cerrar sesión
+            </button>
             <button
               onClick={handleSeed}
               disabled={seeding}
@@ -193,7 +222,12 @@ export default function Home() {
                 {users.map(u => (
                   <tr key={u.id} className="hover:bg-gray-50 transition">
                     <td className="px-4 py-3">
-                      <div className="font-medium text-gray-900">{u.first_name} {u.last_name}</div>
+                      <button
+                        onClick={() => router.push(`/users/${u.id}`)}
+                        className="font-medium text-gray-900 hover:underline text-left"
+                      >
+                        {u.first_name} {u.last_name}
+                      </button>
                     </td>
                     <td className="px-4 py-3 text-gray-600 text-sm">{u.email}</td>
                     <td className="px-4 py-3 text-gray-600 text-sm">{u.age}</td>
